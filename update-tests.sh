@@ -19,6 +19,7 @@ echo "Fetching lld/test from llvm-project..."
 git clone --filter=blob:none --sparse --depth=1 \
     https://github.com/llvm/llvm-project.git "$TMP_CLONE"
 git -C "$TMP_CLONE" sparse-checkout set lld/test
+REVISION=$(git -C $TMP_CLONE reflog -1 --format=%H)
 
 mkdir -p "$DEST"
 
@@ -26,4 +27,5 @@ mkdir -p "$DEST"
 # longer exists upstream, so stale/removed tests don't linger.
 rsync -a --delete "$TMP_CLONE/lld/test/" "$DEST/"
 
-echo "Vendored lld/test to $DEST"
+echo $REVISION > REVISION.txt
+echo "Vendored lld/test ($REVISION) to $DEST"
