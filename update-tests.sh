@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# Updates the vendored LLD tests from upstream llvm-project.
+# Updates the vendored LLD and mold tests from pinned upstream commits.
 #
 # Usage:
 #   ./update-tests.sh
-#
-# Fetches a sparse, shallow clone of just lld/test/ from
-# https://github.com/llvm/llvm-project and syncs it into ./test.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEST="$SCRIPT_DIR/test"
 
-TMP_CLONE="$(mktemp -d)"
-trap 'rm -rf "$TMP_CLONE"' EXIT
+update_tests() (
+    local test_name="$1" git_url="$2" upstream_path="$3" commit="$4"
+    local dest="$SCRIPT_DIR/$test_name"
+    local tmp_clone revision
 
-echo "Fetching lld/test from llvm-project..."
-git clone --filter=blob:none --sparse --depth=1 \
-    https://github.com/llvm/llvm-project.git "$TMP_CLONE"
-git -C "$TMP_CLONE" sparse-checkout set lld/test
-REVISION=$(git -C $TMP_CLONE reflog -1 --format=%H)
+    tmp_clone="$(mktemp -d)"
+    trap 'rm -rf "$tmp_clone"' EXIT
 
-mkdir -p "$DEST"
+    echo "Fetching $upstream_path at $commit from $git_url..."
+    git -C "$tmp_clone" init -q
+    git -C "$tmp_clone" remote add origin "$git_url"
+    git -C "$tmp_clone" sparse-checkout set "$upstream_path"
+    git -C "$tmp_clone" fetch --filter=blob:none --depth=1 origin "$commit"
+    git -C "$tmp_clone" checkout --detach FETCH_HEAD
+    revision="$(git -C "$tmp_clone" rev-parse HEAD)"
 
-# Mirror the upstream test directory, removing anything locally that no
-# longer exists upstream, so stale/removed tests don't linger.
-rsync -a --delete "$TMP_CLONE/lld/test/" "$DEST/"
+    mkdir -p "$dest"
+    # Mirror the upstream directory, deleting stale tests.
+    rsync -a --delete "$tmp_clone/$upstream_path/" "$dest/"
 
-echo $REVISION > REVISION.txt
-echo "Vendored lld/test ($REVISION) to $DEST"
+    printf '%s\n' "$revision" > "$dest/REVISION.txt"
+    echo "Vendored $upstream_path ($revision) to $dest"
+)
+
+update_tests llvm-tests https://github.com/llvm/llvm-project.git lld/test bfb662baf51dfc6e5c75b98c0f913cdbcbec96ad
+update_tests mold-tests https://github.com/rui314/mold.git test 3eca43961ddc8a5f6c670358cda2be8d326a5f96
