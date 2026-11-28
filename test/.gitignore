@@ -1,0 +1,3 @@
+# Config file created by Wild's test harness to run lit with Wild as the linker
+wild-lit.site.cfg.py
+wild-lit.site.cfg.py.tmp.*
